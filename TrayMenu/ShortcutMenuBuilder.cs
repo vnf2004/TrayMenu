@@ -12,7 +12,9 @@ public static class ShortcutMenuBuilder
             return;
         }
 
-        var built = BuildDirectoryItems(folderPath);
+        var order = OrderStore.Load();
+        var root = Path.GetFullPath(folderPath);
+        var built = BuildDirectoryItems(root, root, order);
         if (built.Count == 0)
         {
             items.Add(new ToolStripMenuItem("Нет ярлыков") { Enabled = false });
@@ -25,19 +27,17 @@ public static class ShortcutMenuBuilder
         }
     }
 
-    private static List<ToolStripItem> BuildDirectoryItems(string folderPath)
+    private static List<ToolStripItem> BuildDirectoryItems(
+        string rootFolder,
+        string folderPath,
+        IReadOnlyDictionary<string, List<string>> order)
     {
         var result = new List<ToolStripItem>();
-
-        IEnumerable<string> subDirs;
-        IEnumerable<string> shortcuts;
+        List<string> names;
 
         try
         {
-            subDirs = Directory.EnumerateDirectories(folderPath)
-                .OrderBy(path => Path.GetFileName(path), StringComparer.CurrentCultureIgnoreCase);
-            shortcuts = Directory.EnumerateFiles(folderPath, "*.lnk")
-                .OrderBy(path => Path.GetFileNameWithoutExtension(path), StringComparer.CurrentCultureIgnoreCase);
+            names = OrderStore.GetOrderedChildNames(rootFolder, folderPath, order);
         }
         catch
         {
@@ -45,33 +45,37 @@ public static class ShortcutMenuBuilder
             return result;
         }
 
-        foreach (var dir in subDirs)
+        foreach (var name in names)
         {
-            var children = BuildDirectoryItems(dir);
-            if (children.Count == 0 || children.All(i => !i.Enabled))
+            var fullPath = Path.Combine(folderPath, name);
+            if (Directory.Exists(fullPath))
             {
-                continue;
+                var children = BuildDirectoryItems(rootFolder, fullPath, order);
+                if (children.Count == 0 || children.All(i => !i.Enabled))
+                {
+                    continue;
+                }
+
+                var subMenu = new ToolStripMenuItem(name);
+                foreach (var child in children)
+                {
+                    subMenu.DropDownItems.Add(child);
+                }
+
+                result.Add(subMenu);
             }
-
-            var subMenu = new ToolStripMenuItem(Path.GetFileName(dir));
-            foreach (var child in children)
+            else if (File.Exists(fullPath)
+                     && fullPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
             {
-                subMenu.DropDownItems.Add(child);
+                var item = new ToolStripMenuItem(Path.GetFileNameWithoutExtension(name))
+                {
+                    Tag = fullPath,
+                    Image = TryGetIcon(fullPath)
+                };
+                var path = fullPath;
+                item.Click += (_, _) => LaunchShortcut(path);
+                result.Add(item);
             }
-
-            result.Add(subMenu);
-        }
-
-        foreach (var shortcut in shortcuts)
-        {
-            var item = new ToolStripMenuItem(Path.GetFileNameWithoutExtension(shortcut))
-            {
-                Tag = shortcut,
-                Image = TryGetIcon(shortcut)
-            };
-            var path = shortcut;
-            item.Click += (_, _) => LaunchShortcut(path);
-            result.Add(item);
         }
 
         return result;

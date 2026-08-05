@@ -3,7 +3,8 @@ namespace TrayMenu;
 public sealed class TrayApplicationContext : ApplicationContext
 {
     private readonly NotifyIcon _notifyIcon;
-    private readonly ContextMenuStrip _menu;
+    private readonly ContextMenuStrip _appsMenu;
+    private readonly ContextMenuStrip _systemMenu;
     private readonly System.Windows.Forms.Timer _rebuildTimer;
     private readonly SynchronizationContext _ui;
     private AppConfig _config;
@@ -16,7 +17,6 @@ public sealed class TrayApplicationContext : ApplicationContext
         _config = ConfigStore.Load();
         if (_config.Autostart != Autostart.IsEnabled())
         {
-            // Keep registry in sync with saved preference on startup
             try
             {
                 Autostart.SetEnabled(_config.Autostart);
@@ -28,15 +28,20 @@ public sealed class TrayApplicationContext : ApplicationContext
         }
 
         _trayIcon = CreateTrayIcon();
-        _menu = new ContextMenuStrip();
-        _menu.Opening += (_, _) => RebuildMenu();
+
+        _appsMenu = new ContextMenuStrip();
+        _appsMenu.Opening += (_, _) => RebuildAppsMenu();
+
+        _systemMenu = new ContextMenuStrip();
+        BuildSystemMenu();
 
         _notifyIcon = new NotifyIcon
         {
             Icon = _trayIcon,
             Text = "TrayMenu",
             Visible = true,
-            ContextMenuStrip = _menu
+            // Right click → system menu only
+            ContextMenuStrip = _systemMenu
         };
         _notifyIcon.MouseUp += OnNotifyIconMouseUp;
 
@@ -44,10 +49,10 @@ public sealed class TrayApplicationContext : ApplicationContext
         _rebuildTimer.Tick += (_, _) =>
         {
             _rebuildTimer.Stop();
-            RebuildMenu();
+            RebuildAppsMenu();
         };
 
-        RebuildMenu();
+        RebuildAppsMenu();
         AttachWatcher();
     }
 
@@ -58,37 +63,62 @@ public sealed class TrayApplicationContext : ApplicationContext
             return;
         }
 
-        // Left click also opens the menu (right click uses ContextMenuStrip).
-        _menu.Show(Cursor.Position);
+        // Left click → programs only
+        RebuildAppsMenu();
+        _appsMenu.Show(Cursor.Position);
     }
 
-    private void RebuildMenu()
+    private void RebuildAppsMenu()
     {
-        DisposeMenuImages(_menu.Items);
-        ShortcutMenuBuilder.Populate(_menu.Items, _config.ShortcutsFolder);
+        DisposeMenuImages(_appsMenu.Items);
+        ShortcutMenuBuilder.Populate(_appsMenu.Items, _config.ShortcutsFolder);
+    }
 
-        _menu.Items.Add(new ToolStripSeparator());
+    private void BuildSystemMenu()
+    {
+        _systemMenu.Items.Clear();
 
         var settingsItem = new ToolStripMenuItem("Настройки…");
         settingsItem.Click += (_, _) => OpenSettings();
-        _menu.Items.Add(settingsItem);
+        _systemMenu.Items.Add(settingsItem);
+
+        var editMenuItem = new ToolStripMenuItem("Редактировать меню…");
+        editMenuItem.Click += (_, _) => OpenMenuEditor();
+        _systemMenu.Items.Add(editMenuItem);
+
+        _systemMenu.Items.Add(new ToolStripSeparator());
 
         var exitItem = new ToolStripMenuItem("Выход");
         exitItem.Click += (_, _) => Exit();
-        _menu.Items.Add(exitItem);
+        _systemMenu.Items.Add(exitItem);
     }
 
     private void OpenSettings()
     {
         using var form = new SettingsForm(_config);
-        if (form.ShowDialog() != DialogResult.OK)
+        form.ShowDialog();
+        _config = ConfigStore.Load();
+        AttachWatcher();
+        RebuildAppsMenu();
+    }
+
+    private void OpenMenuEditor()
+    {
+        var folder = _config.ShortcutsFolder;
+        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
         {
+            MessageBox.Show(
+                "Сначала укажите папку с ярлыками в настройках.",
+                "TrayMenu",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            OpenSettings();
             return;
         }
 
-        _config = ConfigStore.Load();
-        AttachWatcher();
-        RebuildMenu();
+        using var editor = new MenuEditorForm(folder);
+        editor.ShowDialog();
+        RebuildAppsMenu();
     }
 
     private void AttachWatcher()
@@ -150,8 +180,9 @@ public sealed class TrayApplicationContext : ApplicationContext
         {
             _rebuildTimer.Dispose();
             _watcher?.Dispose();
-            DisposeMenuImages(_menu.Items);
-            _menu.Dispose();
+            DisposeMenuImages(_appsMenu.Items);
+            _appsMenu.Dispose();
+            _systemMenu.Dispose();
             _notifyIcon.Dispose();
             _trayIcon.Dispose();
         }
