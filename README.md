@@ -38,7 +38,15 @@ dotnet run --project TrayMenu
 
 Exe после сборки: `TrayMenu\bin\Debug\net10.0-windows\TrayMenu.exe`
 
-Публикация без зависимости от установленного runtime:
+Публикация в **один файл** без установки .NET у пользователя:
+
+```powershell
+dotnet publish TrayMenu -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
+```
+
+Результат: `publish\TrayMenu.exe`
+
+Публикация self-contained папкой (несколько файлов):
 
 ```powershell
 dotnet publish TrayMenu -c Release -r win-x64 --self-contained true -o publish
