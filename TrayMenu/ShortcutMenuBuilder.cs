@@ -8,7 +8,7 @@ public static class ShortcutMenuBuilder
 
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
         {
-            items.Add(new ToolStripMenuItem("Папка ярлыков не задана") { Enabled = false });
+            items.Add(new ToolStripMenuItem("Папка не задана") { Enabled = false });
             return;
         }
 
@@ -17,7 +17,7 @@ public static class ShortcutMenuBuilder
         var built = BuildDirectoryItems(root, root, order);
         if (built.Count == 0)
         {
-            items.Add(new ToolStripMenuItem("Нет ярлыков") { Enabled = false });
+            items.Add(new ToolStripMenuItem("Нет элементов") { Enabled = false });
             return;
         }
 
@@ -50,6 +50,11 @@ public static class ShortcutMenuBuilder
             var fullPath = Path.Combine(folderPath, name);
             if (Directory.Exists(fullPath))
             {
+                if (!ShellItems.IsVisible(fullPath))
+                {
+                    continue;
+                }
+
                 var children = BuildDirectoryItems(rootFolder, fullPath, order);
                 if (children.Count == 0 || children.All(i => !i.Enabled))
                 {
@@ -64,16 +69,15 @@ public static class ShortcutMenuBuilder
 
                 result.Add(subMenu);
             }
-            else if (File.Exists(fullPath)
-                     && fullPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
+            else if (File.Exists(fullPath) && ShellItems.IsVisible(fullPath))
             {
-                var item = new ToolStripMenuItem(Path.GetFileNameWithoutExtension(name))
-                {
-                    Tag = fullPath,
-                    Image = TryGetIcon(fullPath)
-                };
                 var path = fullPath;
-                item.Click += (_, _) => LaunchShortcut(path);
+                var item = new ToolStripMenuItem(ShellItems.GetMenuDisplayName(path))
+                {
+                    Tag = path,
+                    Image = TryGetIcon(path)
+                };
+                item.Click += (_, _) => LaunchItem(path);
                 result.Add(item);
             }
         }
@@ -81,20 +85,20 @@ public static class ShortcutMenuBuilder
         return result;
     }
 
-    private static void LaunchShortcut(string shortcutPath)
+    private static void LaunchItem(string path)
     {
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = shortcutPath,
+                FileName = path,
                 UseShellExecute = true
             });
         }
         catch (Exception ex)
         {
             MessageBox.Show(
-                $"Не удалось запустить ярлык:\n{shortcutPath}\n\n{ex.Message}",
+                $"Не удалось открыть:\n{path}\n\n{ex.Message}",
                 "TrayMenu",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);

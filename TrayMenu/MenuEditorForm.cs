@@ -128,7 +128,7 @@ public sealed class MenuEditorForm : Form
     {
         var text = isDirectory
             ? Path.GetFileName(absolutePath)
-            : Path.GetFileNameWithoutExtension(absolutePath);
+            : ShellItems.GetMenuDisplayName(absolutePath);
 
         return new TreeNode(text)
         {
@@ -542,13 +542,8 @@ public sealed class MenuEditorForm : Form
         }
         else
         {
-            if (!newLabel.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
-            {
-                newLabel += ".lnk";
-            }
-
-            newPath = Path.Combine(parentDir, newLabel);
-            // Display without extension — cancel default text apply; we'll set manually
+            var fileName = ShellItems.ToFileNameFromDisplayLabel(data.AbsolutePath, newLabel);
+            newPath = Path.Combine(parentDir, fileName);
         }
 
         if (string.Equals(data.AbsolutePath, newPath, StringComparison.OrdinalIgnoreCase))
@@ -556,7 +551,7 @@ public sealed class MenuEditorForm : Form
             if (!data.IsDirectory)
             {
                 e.CancelEdit = true;
-                node.Text = Path.GetFileNameWithoutExtension(data.AbsolutePath);
+                node.Text = ShellItems.GetMenuDisplayName(data.AbsolutePath);
             }
 
             return;
@@ -598,7 +593,7 @@ public sealed class MenuEditorForm : Form
 
             data.AbsolutePath = newPath;
             e.CancelEdit = true;
-            node.Text = data.IsDirectory ? Path.GetFileName(newPath) : Path.GetFileNameWithoutExtension(newPath);
+            node.Text = data.IsDirectory ? Path.GetFileName(newPath) : ShellItems.GetMenuDisplayName(newPath);
 
             if (data.IsDirectory)
             {

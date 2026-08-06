@@ -14,7 +14,7 @@ public static class OrderStore
 
     /// <summary>
     /// Keys: relative directory path from shortcuts root ("" = root).
-    /// Values: ordered child names (folder names or *.lnk file names).
+    /// Values: ordered child names (folder names or file names).
     /// </summary>
     public static Dictionary<string, List<string>> Load()
     {
@@ -75,15 +75,17 @@ public static class OrderStore
         IReadOnlyDictionary<string, List<string>> order)
     {
         List<string> dirs;
-        List<string> shortcuts;
+        List<string> files;
         try
         {
             dirs = Directory.EnumerateDirectories(absoluteDirectory)
+                .Where(ShellItems.IsVisible)
                 .Select(Path.GetFileName)
                 .Where(n => n is not null)
                 .Cast<string>()
                 .ToList();
-            shortcuts = Directory.EnumerateFiles(absoluteDirectory, "*.lnk")
+            files = Directory.EnumerateFiles(absoluteDirectory)
+                .Where(ShellItems.IsVisible)
                 .Select(Path.GetFileName)
                 .Where(n => n is not null)
                 .Cast<string>()
@@ -94,7 +96,7 @@ public static class OrderStore
             return [];
         }
 
-        var existing = new HashSet<string>(dirs.Concat(shortcuts), StringComparer.OrdinalIgnoreCase);
+        var existing = new HashSet<string>(dirs.Concat(files), StringComparer.OrdinalIgnoreCase);
         var key = ToRelativeDir(rootFolder, absoluteDirectory);
 
         if (order.TryGetValue(key, out var preferred) && preferred.Count > 0)
@@ -104,20 +106,20 @@ public static class OrderStore
             {
                 if (existing.Remove(name))
                 {
-                    result.Add(GetActualName(dirs, shortcuts, name));
+                    result.Add(GetActualName(dirs, files, name));
                 }
             }
 
-            // New items: folders first, then shortcuts, alphabetical
+            // New items: folders first, then files, alphabetical
             result.AddRange(dirs.Where(d => existing.Contains(d))
                 .OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase));
-            result.AddRange(shortcuts.Where(s => existing.Contains(s))
+            result.AddRange(files.Where(s => existing.Contains(s))
                 .OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase));
             return result;
         }
 
         return dirs.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
-            .Concat(shortcuts.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase))
+            .Concat(files.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase))
             .ToList();
     }
 
@@ -258,7 +260,7 @@ public static class OrderStore
         return key.StartsWith(parentPrefix + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string GetActualName(List<string> dirs, List<string> shortcuts, string name)
+    private static string GetActualName(List<string> dirs, List<string> files, string name)
     {
         var d = dirs.FirstOrDefault(x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
         if (d is not null)
@@ -266,7 +268,7 @@ public static class OrderStore
             return d;
         }
 
-        var s = shortcuts.FirstOrDefault(x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
+        var s = files.FirstOrDefault(x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
         return s ?? name;
     }
 }
