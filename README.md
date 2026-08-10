@@ -34,6 +34,7 @@
 ```powershell
 dotnet build
 dotnet run --project TrayMenu
+dotnet test
 ```
 
 Exe после сборки: `TrayMenu\bin\Debug\net10.0-windows\TrayMenu.exe`
