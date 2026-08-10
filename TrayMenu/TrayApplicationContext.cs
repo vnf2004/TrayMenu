@@ -3,8 +3,8 @@ namespace TrayMenu;
 public sealed class TrayApplicationContext : ApplicationContext
 {
     private readonly NotifyIcon _notifyIcon;
-    private readonly ContextMenuStrip _appsMenu;
-    private readonly ContextMenuStrip _systemMenu;
+    private readonly NoTaskbarContextMenuStrip _appsMenu;
+    private readonly NoTaskbarContextMenuStrip _systemMenu;
     private readonly System.Windows.Forms.Timer _rebuildTimer;
     private readonly SynchronizationContext _ui;
     private AppConfig _config;
@@ -29,10 +29,10 @@ public sealed class TrayApplicationContext : ApplicationContext
 
         _trayIcon = CreateTrayIcon();
 
-        _appsMenu = new ContextMenuStrip();
+        _appsMenu = new NoTaskbarContextMenuStrip();
         _appsMenu.Opening += (_, _) => RebuildAppsMenu();
 
-        _systemMenu = new ContextMenuStrip();
+        _systemMenu = new NoTaskbarContextMenuStrip();
         BuildSystemMenu();
 
         _notifyIcon = new NotifyIcon

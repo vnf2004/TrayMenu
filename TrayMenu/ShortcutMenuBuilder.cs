@@ -61,7 +61,11 @@ public static class ShortcutMenuBuilder
                     continue;
                 }
 
-                var subMenu = new ToolStripMenuItem(name);
+                var subMenu = new ToolStripMenuItem(name)
+                {
+                    Image = ShellItems.TryGetShellIcon(fullPath),
+                    DropDown = new NoTaskbarDropDownMenu()
+                };
                 foreach (var child in children)
                 {
                     subMenu.DropDownItems.Add(child);
@@ -75,7 +79,7 @@ public static class ShortcutMenuBuilder
                 var item = new ToolStripMenuItem(ShellItems.GetMenuDisplayName(path))
                 {
                     Tag = path,
-                    Image = TryGetIcon(path)
+                    Image = ShellItems.TryGetShellIcon(path) ?? TryGetIcon(path)
                 };
                 item.Click += (_, _) => LaunchItem(path);
                 result.Add(item);
